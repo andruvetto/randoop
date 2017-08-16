@@ -1,8 +1,5 @@
 package randoop.main;
 
-import com.github.javaparser.ParseException;
-import com.github.javaparser.ast.CompilationUnit;
-import com.github.javaparser.ast.stmt.BlockStmt;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -14,6 +11,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.regex.Pattern;
+
+import com.github.javaparser.ParseException;
+import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.stmt.BlockStmt;
+
 import plume.EntryReader;
 import plume.Options;
 import plume.Options.ArgException;
@@ -41,6 +43,7 @@ import randoop.output.FailingTestFilter;
 import randoop.output.JUnitCreator;
 import randoop.output.JavaFileWriter;
 import randoop.output.MinimizerWriter;
+import randoop.output.QuickcheckCreator;
 import randoop.output.RandoopOutputException;
 import randoop.reflection.DefaultReflectionPredicate;
 import randoop.reflection.OperationModel;
@@ -446,6 +449,22 @@ public class GenTests extends GenInputsAbstract {
       return true;
     }
 
+    JavaFileWriter javaFileWriter = new JavaFileWriter(junit_output_dir);
+
+    if (GenInputsAbstract.quickcheck) {
+      System.out.println(GenInputsAbstract.testclass);
+      System.out.print("Generate quickcheck");
+      QuickcheckCreator quickcheckCreator = new QuickcheckCreator(junit_package_name);
+      CodeWriter codeWriter = javaFileWriter;
+      WriteQuickcheckFile(
+          quickcheckCreator,
+          explorer.getRegressionSequences(),
+          codeWriter,
+          GenInputsAbstract.quickcheck_basename,
+          "Quickcheck");
+      return true;
+    }
+
     JUnitCreator junitCreator =
         JUnitCreator.getTestCreator(
             junit_package_name,
@@ -454,7 +473,6 @@ public class GenTests extends GenInputsAbstract {
             beforeEachFixtureBody,
             afterEachFixtureBody);
 
-    JavaFileWriter javaFileWriter = new JavaFileWriter(junit_output_dir);
     if (!GenInputsAbstract.no_error_revealing_tests) {
       CodeWriter codeWriter = javaFileWriter;
       if (GenInputsAbstract.minimize_error_test || GenInputsAbstract.stop_on_error_test) {
@@ -562,6 +580,62 @@ public class GenTests extends GenInputsAbstract {
       }
     } catch (RandoopOutputException e) {
       System.out.printf("%nError writing " + testKind.toLowerCase() + " tests: " + e.getMessage());
+      System.exit(1);
+    }
+  }
+  
+  
+  /**
+   * Creates the quickcheck classes for the test sequences using the {@link QuickcheckCreator} and then writes
+   * the files using the {@link CodeWriter}. 
+   *
+   * <p>Class names are numbered with {@code basename} as the prefix. The package for tests is
+   * {@link GenInputsAbstract#junit_package_name}.
+   *
+   * @param quickcheckCreator the {@link JUnitCreator} to create the test class source
+   * @param sequences a list of {@link ExecutableSequence} objects for methods
+   * @param codeWriter the {@link CodeWriter} to output the test classes
+   * @param basename the prefix for the class name
+   */
+  private void WriteQuickcheckFile(
+      QuickcheckCreator quickcheckCreator,
+      List<ExecutableSequence> sequences,
+      CodeWriter codeWriter,
+      String basename,
+      String quickcheckKind) {
+    if (sequences.isEmpty()) {
+      if (GenInputsAbstract.progressdisplay) {
+        System.out.printf("%nNo " + quickcheckKind.toLowerCase() + " methods to output%n");
+      }
+      return;
+    }
+    if (GenInputsAbstract.progressdisplay) {
+      System.out.printf("%n%s method output:%n", quickcheckKind);
+      System.out.printf("%s method count: %d%n", quickcheckKind, sequences.size());
+      System.out.printf("Writing methods for quickcheck...%n");
+    }
+    try {
+      List<File> quickcheckFiles = new ArrayList<>();
+
+      // Create and write quickcheck classes.
+      LinkedHashMap<String, CompilationUnit> testMap =
+          getQuickcheckASTMap(basename, sequences, quickcheckCreator);
+      for (Map.Entry<String, CompilationUnit> entry : testMap.entrySet()) {
+        String classname = entry.getKey();
+        String classSource = entry.getValue().toString();
+        quickcheckFiles.add(
+            codeWriter.writeClassCode(
+                GenInputsAbstract.junit_package_name, classname, classSource));
+      }
+      if (GenInputsAbstract.progressdisplay) {
+        System.out.println();
+        for (File f : quickcheckFiles) {
+          System.out.printf("Created file %s%n", f.getAbsolutePath());
+        }
+      }
+    } catch (RandoopOutputException e) {
+      System.out.printf(
+          "%nError writing " + quickcheckKind.toLowerCase() + " methods: " + e.getMessage());
       System.exit(1);
     }
   }
@@ -776,6 +850,25 @@ public class GenTests extends GenInputsAbstract {
       CompilationUnit classAST =
           junitCreator.createTestClass(testClassName, TEST_METHOD_NAME_PREFIX, partition);
       testMap.put(testClassName, classAST);
+    }
+    return testMap;
+  }
+
+  private LinkedHashMap<String, CompilationUnit> getQuickcheckASTMap(
+      String quickcheckPrefix,
+      List<ExecutableSequence> sequences,
+      QuickcheckCreator quickcheckCreator) {
+
+    List<List<ExecutableSequence>> sequencePartition =
+        CollectionsExt.formSublists(new ArrayList<>(sequences), testsperfile);
+
+    LinkedHashMap<String, CompilationUnit> testMap = new LinkedHashMap<>();
+    for (int i = 0; i < sequencePartition.size(); i++) {
+      List<ExecutableSequence> partition = sequencePartition.get(i);
+      String quickcheckClassName = quickcheckPrefix + i;
+      CompilationUnit classAST =
+          quickcheckCreator.createQuickcheckClass(quickcheckClassName, "method", partition);
+      testMap.put(quickcheckClassName, classAST);
     }
     return testMap;
   }

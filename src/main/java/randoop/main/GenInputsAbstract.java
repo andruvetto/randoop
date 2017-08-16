@@ -8,6 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
+
 import plume.EntryReader;
 import plume.Option;
 import plume.OptionGroup;
@@ -149,6 +150,9 @@ public abstract class GenInputsAbstract extends CommandHandler {
    */
   ///////////////////////////////////////////////////////////////////////////
   @OptionGroup("Which tests to output")
+  @Option("Wheter to output quickcheck methods")
+  public static boolean quickcheck = false;
+
   @Option("Whether to output error-revealing tests")
   public static boolean no_error_revealing_tests = false;
 
@@ -488,6 +492,10 @@ public abstract class GenInputsAbstract extends CommandHandler {
   /** Base name (no ".java" suffix) of the JUnit file containing regression tests */
   @Option("Base name of the JUnit file(s) containing regression tests")
   public static String regression_test_basename = "RegressionTest";
+
+  /** Base name (no ".java" suffix) of the quickcheck file containing methods for generator */
+  @Option("Base name of the quickcheck file(s) containing methods for generator")
+  public static String quickcheck_basename = "Quickcheck";
 
   /**
    * Name of the package for the generated JUnit files. When the package is the same as the package
