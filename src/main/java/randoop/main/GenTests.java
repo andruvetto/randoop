@@ -1,5 +1,8 @@
 package randoop.main;
 
+import com.github.javaparser.ParseException;
+import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.stmt.BlockStmt;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -11,11 +14,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.regex.Pattern;
-
-import com.github.javaparser.ParseException;
-import com.github.javaparser.ast.CompilationUnit;
-import com.github.javaparser.ast.stmt.BlockStmt;
-
 import plume.EntryReader;
 import plume.Options;
 import plume.Options.ArgException;
@@ -583,11 +581,10 @@ public class GenTests extends GenInputsAbstract {
       System.exit(1);
     }
   }
-  
-  
+
   /**
-   * Creates the quickcheck classes for the test sequences using the {@link QuickcheckCreator} and then writes
-   * the files using the {@link CodeWriter}. 
+   * Creates the quickcheck classes for the test sequences using the {@link QuickcheckCreator} and
+   * then writes the files using the {@link CodeWriter}.
    *
    * <p>Class names are numbered with {@code basename} as the prefix. The package for tests is
    * {@link GenInputsAbstract#junit_package_name}.
